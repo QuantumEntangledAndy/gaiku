@@ -13,26 +13,22 @@ impl Baker for VoxelBaker {
     T: Texturify2d,
     M: Meshify,
   {
+    let width = chunk.width();
+    let height = chunk.height();
+    let depth = chunk.depth();
+
     let mut builder = MeshBuilder::create(
-      [
-        chunk.width() as f32 / 2.0,
-        chunk.height() as f32 / 2.0,
-        chunk.depth() as f32 / 2.0,
-      ],
-      [
-        chunk.width() as f32,
-        chunk.height() as f32,
-        chunk.depth() as f32,
-      ],
+      [width as f32 / 2.0, height as f32 / 2.0, depth as f32 / 2.0],
+      [width as f32, height as f32, depth as f32],
     );
 
-    let x_limit = chunk.width() as usize - 1;
-    let y_limit = chunk.height() as usize - 1;
-    let z_limit = chunk.depth() as usize - 1;
+    let x_limit = width as usize - 1;
+    let y_limit = height as usize - 1;
+    let z_limit = depth as usize - 1;
 
-    for x in 0..chunk.width() as usize {
-      for y in 0..chunk.height() as usize {
-        for z in 0..chunk.depth() as usize {
+    for x in 0..width as usize {
+      for y in 0..height as usize {
+        for z in 0..depth as usize {
           if chunk.is_air(x, y, z) {
             continue;
           }
