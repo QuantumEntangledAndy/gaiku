@@ -23,38 +23,33 @@ jobs:
             toolchain:  nightly
             components: cargo
 
-      # Check out the base of this PR
-      - name:           Checkout Base
+      - name:           Checkout
         uses:           actions/checkout@v2
         with:
-          ref:          ${{ github.base_ref }}
-      # Bench on base of the PR
+          ref:          ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      # Bench on the base of this PR
+      - name:           Checkout Base
+        run: |
+          git branch ${{ github.base_ref }} origin/${{ github.base_ref }}
       - name:           Bench Base
         uses:           actions-rs/cargo@v1
         with:
           command:      bench
           toolchain:    nightly
           args:         --all-features --all
-      - name:           Save criterion reports
-        run:            |
-          rsync -a target/criterion ../
-      # Check out the last commit of this PR
-      - name:           Checkout PR
-        uses:           actions/checkout@v2
-        with:
-          ref:          ${{ github.event.pull_request.head.sha }}
-      - name:           Restoring criterion reports
-        run:            |
-          rsync -a ../criterion target/
       # Bench on the last commit of this PR
+      - name:           Checkout PR
+        run: |
+          git branch ${{ github.event.pull_request.head.sha }} ${{ github.event.pull_request.head.sha }}
       - name:           Bench PR
         uses:           actions-rs/cargo@v1
         with:
           command:      bench
           toolchain:    nightly
           args:         --all-features --all
-      - name: Save Reports
-        uses: actions/upload-artifact@v2
+      - name:           Export Reports
+        uses:           actions/upload-artifact@v2
         with:
-          name: Reports
-          path: "target/criterion"
+          name:         Reports
+          path:         "target/criterion"
