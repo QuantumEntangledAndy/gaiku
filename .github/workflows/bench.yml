@@ -1,49 +1,55 @@
-name:                Bench
+name:                   Bench
 
 on:
   pull_request:
-    branches:        [ master ]
+    branches:           [ master ]
 
 env:
-  CARGO_TERM_COLOR:  always
+  CARGO_TERM_COLOR:     always
 
 jobs:
   build:
 
-    runs-on:         ubuntu-latest
+    runs-on:            ubuntu-latest
 
     steps:
-      - name:        Install dependencies
-        run: |
+      - name:           Install dependencies
+        run:            |
           sudo apt update
           sudo apt-get install -y gcc pkg-config openssl libasound2-dev cmake build-essential python3 libfreetype6-dev libexpat1-dev libxcb-composite0-dev libssl-dev libx11-dev pulseaudio
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
+      - name:           Install latest nightly
+        uses:           actions-rs/toolchain@v1
         with:
-            toolchain: nightly
+            toolchain:  nightly
             components: cargo
 
       # Check out the base of this PR
-      - name:        Checkout
-        uses:        actions/checkout@v2
+      - name:           Checkout Base
+        uses:           actions/checkout@v2
         with:
-          ref: ${{ github.base_ref }}
+          ref:          ${{ github.base_ref }}
       # Bench on base of the PR
-      - name:        Bench
-        uses:        actions-rs/cargo@v1
+      - name:           Bench Base
+        uses:           actions-rs/cargo@v1
         with:
-          command: bench
-          toolchain: nightly
-          args:    --verbose --all-features --all
+          command:      bench
+          toolchain:    nightly
+          args:         --all-features --all
+      - name:           Save criterion reports
+        run:            |
+          rsync -a target/criterion ../
       # Check out the last commit of this PR
-      - name:        Checkout
-        uses:        actions/checkout@v2
+      - name:           Checkout PR
+        uses:           actions/checkout@v2
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref:          ${{ github.event.pull_request.head.sha }}
+      - name:           Restoring criterion reports
+        run:            |
+          rsync -a ../criterion target/
       # Bench on the last commit of this PR
-      - name:        Bench
-        uses:        actions-rs/cargo@v1
+      - name:           Bench PR
+        uses:           actions-rs/cargo@v1
         with:
-          command: bench
-          toolchain: nightly
-          args:    --verbose --all-features --all
+          command:      bench
+          toolchain:    nightly
+          args:         --all-features --all
