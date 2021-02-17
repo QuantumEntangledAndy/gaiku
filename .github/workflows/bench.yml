@@ -53,3 +53,8 @@ jobs:
           command:      bench
           toolchain:    nightly
           args:         --all-features --all
+      - name: Save Reports
+        uses: actions/upload-artifact@v2
+        with:
+          name: Reports
+          path: "target/criterion"
