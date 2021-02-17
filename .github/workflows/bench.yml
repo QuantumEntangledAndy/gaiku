@@ -1,8 +1,6 @@
-name:                Rust
+name:                Bench
 
 on:
-  push:
-    branches:        [ master ]
   pull_request:
     branches:        [ master ]
 
@@ -15,8 +13,6 @@ jobs:
     runs-on:         ubuntu-latest
 
     steps:
-      - name:        Checkout
-        uses:        actions/checkout@v2
       - name:        Install dependencies
         run: |
           sudo apt update
@@ -26,15 +22,28 @@ jobs:
         with:
             toolchain: nightly
             components: cargo
-      - name:        Build
+
+      # Check out the base of this PR
+      - name:        Checkout
+        uses:        actions/checkout@v2
+        with:
+          ref: ${{ github.base_ref }}
+      # Bench on base of the PR
+      - name:        Bench
         uses:        actions-rs/cargo@v1
         with:
-          command: build
+          command: bench
           toolchain: nightly
-          args:    --verbose --all-features
-      - name:        Test
+          args:    --verbose --all-features --all
+      # Check out the last commit of this PR
+      - name:        Checkout
+        uses:        actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      # Bench on the last commit of this PR
+      - name:        Bench
         uses:        actions-rs/cargo@v1
         with:
-          command: test
+          command: bench
           toolchain: nightly
           args:    --verbose --all-features --all
