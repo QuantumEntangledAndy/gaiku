@@ -33,12 +33,12 @@ impl Boundary {
   }
 
   pub fn contains(&self, point: &Vector3<f32>) -> bool {
-    self.start.x < point.x
-      && self.start.y < point.y
-      && self.start.z < point.z
-      && self.end.x > point.x
-      && self.end.y > point.y
-      && self.end.z > point.z
+    self.start.x <= point.x
+      && self.start.y <= point.y
+      && self.start.z <= point.z
+      && self.end.x >= point.x
+      && self.end.y >= point.y
+      && self.end.z >= point.z
   }
 
   #[allow(dead_code)]
