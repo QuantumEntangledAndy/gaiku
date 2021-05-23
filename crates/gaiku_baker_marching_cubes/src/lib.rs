@@ -47,6 +47,23 @@ impl GridCell {
   }
 }
 
+fn vec_sub(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
+  [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+fn vec_cross(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
+  [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ]
+}
+fn compute_normal(triangle: &[[f32; 3]; 3]) -> [f32; 3] {
+  vec_cross(
+    &vec_sub(&triangle[1], &triangle[0]),
+    &vec_sub(&triangle[2], &triangle[0]),
+  )
+}
+
 /// Implementation of the marching cubes terrain generation.
 pub struct MarchingCubesBaker;
 
@@ -207,7 +224,13 @@ impl Baker for MarchingCubesBaker {
           Self::polygonize(&grid, 1, &mut triangles);
 
           for vertex in triangles {
-            builder.add_triangle(vertex, None, None, 0);
+            let normal = compute_normal(&vertex);
+            builder.add_triangle(
+              vertex,                      // triangle
+              Some(normal),                // normal
+              None,                        // uv
+              chunk.get(x, y, z).0.into(), // atlas
+            );
           }
         }
       }
