@@ -24,6 +24,10 @@ pub mod mesh;
 /// Texture related traits/implementation.
 pub mod texture;
 //mod tree;
+/// Chunk tree is used for lods and neighbours
+pub mod chunktree;
+/// Density is used for sampled 3d density maps
+pub mod density;
 
 /// `use gaiku_common::prelude::*;` to import common traits and utils.
 pub mod prelude {
