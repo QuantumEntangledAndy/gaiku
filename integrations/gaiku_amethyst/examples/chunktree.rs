@@ -47,11 +47,14 @@ fn main() -> amethyst::Result<()> {
     .with_bundle(render_bund)?
     // With transform systems for position tracking
     .with_bundle(TransformBundle::new())?
-    .with_bundle(FlyControlBundle::<StringBindings>::new(
-      Some(String::from("right")),
-      Some(String::from("up")),
-      Some(String::from("forward")),
-    ))?
+    .with_bundle(
+      FlyControlBundle::<StringBindings>::new(
+        Some(String::from("right")),
+        Some(String::from("up")),
+        Some(String::from("forward")),
+      )
+      .with_speed(100.),
+    )?
     .with_bundle(input_bundle)?
     .with_bundle(UiBundle::<StringBindings>::new())?;
 

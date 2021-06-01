@@ -115,7 +115,7 @@ impl GameLoad {
 
   fn noise(&self, x: f32, y: f32, z: f32) -> f32 {
     const GROUND_HEIGHT: f32 = 0.0; // Could replace with 2D noise
-    const HEIGHT_DROPOFF: f32 = 1.0 / 100.;
+    const HEIGHT_DROPOFF: f32 = 1.0 / 1000.;
 
     // The fbm noise
     let coords = [x as f64, y as f64, z as f64];
