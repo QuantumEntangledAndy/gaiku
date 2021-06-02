@@ -168,11 +168,15 @@ impl MarchingCubesBaker {
 }
 
 impl Baker for MarchingCubesBaker {
-  type Value = (u8, u8);
+  type Value = u8;
+  type Coord = u16;
+  type AtlasValue = u8;
 
   fn bake<C, T, M>(chunk: &C, _options: &BakerOptions<T>) -> Result<Option<M>>
   where
-    C: Chunkify<Self::Value> + Sizable,
+    C: Chunkify<Self::Coord, Self::Value>
+      + Sizable<Self::Coord>
+      + Atlasify<Self::Coord, Self::AtlasValue>,
     T: Texturify2d,
     M: Meshify,
   {
@@ -192,21 +196,24 @@ impl Baker for MarchingCubesBaker {
     // TODO: Solve issue where data of next chunk is needed to bake the chunk
     for x in 0..chunk.width() as usize - 1 {
       let fx = x as f32;
+      let x = x as Self::Coord;
       for y in 0..chunk.height() as usize - 1 {
         let fy = y as f32;
+        let y = y as Self::Coord;
         for z in 0..chunk.depth() as usize - 1 {
           let fz = z as f32;
+          let z = z as Self::Coord;
 
           let grid = GridCell {
             value: [
-              chunk.get(x, y, z).1,
-              chunk.get(x + 1, y, z).1,
-              chunk.get(x + 1, y + 1, z).1,
-              chunk.get(x, y + 1, z).1,
-              chunk.get(x, y, z + 1).1,
-              chunk.get(x + 1, y, z + 1).1,
-              chunk.get(x + 1, y + 1, z + 1).1,
-              chunk.get(x, y + 1, z + 1).1,
+              chunk.get(x, y, z),
+              chunk.get(x + 1, y, z),
+              chunk.get(x + 1, y + 1, z),
+              chunk.get(x, y + 1, z),
+              chunk.get(x, y, z + 1),
+              chunk.get(x + 1, y, z + 1),
+              chunk.get(x + 1, y + 1, z + 1),
+              chunk.get(x, y + 1, z + 1),
             ],
             point: [
               [fx + 0.0, fy + 0.0, fz + 0.0].into(),
@@ -226,10 +233,10 @@ impl Baker for MarchingCubesBaker {
           for vertex in triangles {
             let normal = compute_normal(&vertex);
             builder.add_triangle(
-              vertex,                      // triangle
-              Some(normal),                // normal
-              None,                        // uv
-              chunk.get(x, y, z).0.into(), // atlas
+              vertex,                          // triangle
+              Some(normal),                    // normal
+              None,                            // uv
+              chunk.get_atlas(x, y, z).into(), // atlas
             );
           }
         }

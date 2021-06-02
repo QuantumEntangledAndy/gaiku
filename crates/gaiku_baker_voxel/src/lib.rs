@@ -5,11 +5,15 @@ pub struct VoxelBaker;
 
 // TODO: Optimize, don't create faces between chunks if there's a non empty voxel
 impl Baker for VoxelBaker {
-  type Value = (u8, u8);
+  type Coord = u16;
+  type Value = u8;
+  type AtlasValue = u8;
 
   fn bake<C, T, M>(chunk: &C, options: &BakerOptions<T>) -> Result<Option<M>>
   where
-    C: Chunkify<Self::Value> + Sizable,
+    C: Chunkify<Self::Coord, Self::Value>
+      + Sizable<Self::Coord>
+      + Atlasify<Self::Coord, Self::AtlasValue>,
     T: Texturify2d,
     M: Meshify,
   {
@@ -32,11 +36,11 @@ impl Baker for VoxelBaker {
     for x in 0..chunk_width as usize {
       for y in 0..chunk_height as usize {
         for z in 0..chunk_depth as usize {
-          if chunk.is_air(x, y, z) {
+          if chunk.is_air(x as Self::Coord, y as Self::Coord, z as Self::Coord) {
             continue;
           }
 
-          let (atlas_index, _) = chunk.get(x, y, z);
+          let atlas_index = chunk.get_atlas(x as Self::Coord, y as Self::Coord, z as Self::Coord);
           let uv = if let Some(texture) = &options.texture {
             Some(texture.get_uv(atlas_index))
           } else {
@@ -55,7 +59,8 @@ impl Baker for VoxelBaker {
           let bottom_left_front = [fx, fy, fz + 1.0];
 
           // Top
-          if y == y_limit || chunk.is_air(x, y + 1, z) {
+          if y == y_limit || chunk.is_air(x as Self::Coord, y as Self::Coord + 1, z as Self::Coord)
+          {
             builder.add_face(
               [
                 top_right_back,
@@ -74,7 +79,9 @@ impl Baker for VoxelBaker {
           }
 
           // Bottom
-          if y == 0 || (y > 0 && chunk.is_air(x, y - 1, z)) {
+          if y == 0
+            || (y > 0 && chunk.is_air(x as Self::Coord, y as Self::Coord - 1, z as Self::Coord))
+          {
             builder.add_face(
               [
                 bottom_left_back,
@@ -93,7 +100,9 @@ impl Baker for VoxelBaker {
           }
 
           // Left
-          if x == 0 || (x > 0 && chunk.is_air(x - 1, y, z)) {
+          if x == 0
+            || (x > 0 && chunk.is_air(x as Self::Coord - 1, y as Self::Coord, z as Self::Coord))
+          {
             builder.add_face(
               [
                 top_left_front,
@@ -112,7 +121,8 @@ impl Baker for VoxelBaker {
           }
 
           // Right
-          if x == x_limit || chunk.is_air(x + 1, y, z) {
+          if x == x_limit || chunk.is_air(x as Self::Coord + 1, y as Self::Coord, z as Self::Coord)
+          {
             builder.add_face(
               [
                 top_right_back,
@@ -131,7 +141,8 @@ impl Baker for VoxelBaker {
           }
 
           // Front
-          if z == z_limit || chunk.is_air(x, y, z + 1) {
+          if z == z_limit || chunk.is_air(x as Self::Coord, y as Self::Coord, z as Self::Coord + 1)
+          {
             builder.add_face(
               [
                 top_right_front,
@@ -150,7 +161,7 @@ impl Baker for VoxelBaker {
           }
 
           // Back
-          if z == 0 || chunk.is_air(x, y, z - 1) {
+          if z == 0 || chunk.is_air(x as Self::Coord, y as Self::Coord, z as Self::Coord - 1) {
             builder.add_face(
               [
                 top_left_back,

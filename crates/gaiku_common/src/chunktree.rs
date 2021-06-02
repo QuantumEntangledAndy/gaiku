@@ -1,20 +1,9 @@
-pub struct ChunkTreeLeaf<Data> {
-  /// Bounds represents the desired size of the domain in (min, max)
-  bounds: ([f32; 3], [f32; 3]),
-
-  /// Arbitary data for this LOD level
-  data: Option<Data>,
-
-  /// LOD Level 0 is highest detail
-  level: usize,
-}
-
 /// This is an octtree holds chunks at different LODs
 /// The root of the tree is the whole terrain at the
 /// lowest LOD
 /// Subsequent levels hold the higher detail LODS at higher
-// resolutions, up to the number of desired LODS.
-// Values are held in a leaf so that we can iter them.
+/// resolutions, up to the number of desired LODS.
+// Note: Values are held in a leaf so that we can iter them.
 // Originally both children and data were on the same struct
 // but this causes issues with who owns the data during an iter
 pub struct ChunkTree<Data> {
@@ -32,39 +21,48 @@ pub struct ChunkTree<Data> {
 }
 
 impl<Data> ChunkTree<Data> {
+  /// Get the bounds (min, max) that this leaf encloses
   pub fn get_bounds(&self) -> &([f32; 3], [f32; 3]) {
     self.value.get_bounds()
   }
 
+  /// Set the arbitary data for this leaf
   pub fn set_data(&mut self, data: Data) {
     self.value.set_data(data)
   }
 
+  /// Get the arbitary data for this leaf
   pub fn get_data(&self) -> Option<&Data> {
     self.value.get_data()
   }
 
+  /// Get the mutable arbitary data for this leaf
   pub fn get_data_mut(&mut self) -> Option<&mut Data> {
     self.value.get_data_mut()
   }
 
+  /// Get the center of this leaf
   pub fn get_center(&self) -> [f32; 3] {
     self.value.get_center()
   }
 
+  /// Get the size of this leaf
   pub fn get_size(&self) -> [f32; 3] {
     self.value.get_size()
   }
 
-  /// Gets the origin (min) of the leaf
+  /// Get the origin (min) of the leaf
   pub fn get_origin(&self) -> [f32; 3] {
     self.value.get_origin()
   }
 
+  /// Get the lod level of this leaf. 0 is the highest detail
   pub fn get_level(&self) -> usize {
     self.value.get_level()
   }
 
+  /// Create a new level of the tree. If levels > 0 then also create its children
+  /// bounds are the space this tree encloses in (min, max)
   pub fn new(bounds: ([f32; 3], [f32; 3]), levels: usize) -> ChunkTree<Data> {
     let new_children = if levels > 0 {
       let new_levels = levels - 1;
@@ -152,33 +150,52 @@ impl<Data> ChunkTree<Data> {
     }
   }
 
-  /// Iters over all leafs in the tree
+  /// Iter over all leafs in the tree
   pub fn iter(&self) -> ChunkTreeIter<'_, Data> {
     ChunkTreeIter::new(self)
   }
 
+  /// Iter over all leafs in the tree mutably
   pub fn iter_mut(&mut self) -> ChunkTreeIterMut<'_, Data> {
     ChunkTreeIterMut::new(self)
   }
 }
 
+/// The leaf holds the actual data of the tree
+/// but not the relations such as children
+pub struct ChunkTreeLeaf<Data> {
+  /// Bounds represents the desired size of the domain in (min, max)
+  bounds: ([f32; 3], [f32; 3]),
+
+  /// Arbitary data for this LOD level
+  data: Option<Data>,
+
+  /// LOD Level 0 is highest detail
+  level: usize,
+}
+
 impl<Data> ChunkTreeLeaf<Data> {
+  /// Get the bounds this leaf encloses
   pub fn get_bounds(&self) -> &([f32; 3], [f32; 3]) {
     &self.bounds
   }
 
+  /// Set the arbitary data of this leaf
   pub fn set_data(&mut self, data: Data) {
     self.data = Some(data);
   }
 
+  /// Get the arbitary data of this leaf
   pub fn get_data(&self) -> Option<&Data> {
     self.data.as_ref()
   }
 
+  /// Get the mutable arbitary data of this leaf
   pub fn get_data_mut(&mut self) -> Option<&mut Data> {
     self.data.as_mut()
   }
 
+  /// Get the center of the leaf
   pub fn get_center(&self) -> [f32; 3] {
     let (min, max) = self.bounds;
     [
@@ -188,6 +205,7 @@ impl<Data> ChunkTreeLeaf<Data> {
     ]
   }
 
+  /// Get the size of the leaf
   pub fn get_size(&self) -> [f32; 3] {
     let (min, max) = self.bounds;
     [max[0] - min[0], max[1] - min[1], max[2] - min[2]]
@@ -199,10 +217,12 @@ impl<Data> ChunkTreeLeaf<Data> {
     [min[0], min[1], min[2]]
   }
 
+  /// Get the lod level of the leaf. 0 represents the highest detail
   pub fn get_level(&self) -> usize {
     self.level
   }
 
+  /// Create a new leaf without any arbitary data
   fn new(bounds: ([f32; 3], [f32; 3]), levels: usize) -> ChunkTreeLeaf<Data> {
     let data: Option<Data> = None;
 
@@ -215,6 +235,8 @@ impl<Data> ChunkTreeLeaf<Data> {
   }
 }
 
+/// This is the iter of a tree.
+/// It visits every leaf
 pub struct ChunkTreeIter<'a, Data> {
   stack: Vec<&'a ChunkTree<Data>>,
 }
@@ -237,6 +259,8 @@ impl<'a, Data> Iterator for ChunkTreeIter<'a, Data> {
   }
 }
 
+/// This is the mutable iter of a tree.
+/// It visits every leaf
 pub struct ChunkTreeIterMut<'a, Data> {
   stack: Vec<&'a mut ChunkTree<Data>>,
 }
@@ -259,6 +283,8 @@ impl<'a, Data> Iterator for ChunkTreeIterMut<'a, Data> {
   }
 }
 
+/// This is the visible iter of a tree.
+/// It visits only leafs that are visible
 pub struct ChunkTreeVisibleIter<'a, 'b, Data> {
   stack: Vec<&'a ChunkTree<Data>>,
   camera_position: &'b [f32; 3],
@@ -306,6 +332,8 @@ impl<'a, 'b, Data> Iterator for ChunkTreeVisibleIter<'a, 'b, Data> {
   }
 }
 
+/// This is the mutable visible iter of a tree.
+/// It visits only leafs that are visible
 pub struct ChunkTreeVisibleIterMut<'a, 'b, Data> {
   stack: Vec<&'a mut ChunkTree<Data>>,
   camera_position: &'b [f32; 3],

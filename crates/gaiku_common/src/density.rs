@@ -6,8 +6,6 @@
 /// Gradient infomation is also approximated
 ///
 /// To make a surface using a baker we must sample the isosurface.
-use crate::prelude::*;
-
 const EPSILON: f32 = 1e-4;
 
 pub enum InterpolateMethod {
@@ -482,44 +480,5 @@ impl DensityData {
 
   pub fn get_value_gradient(&self, x: f32, y: f32, z: f32) -> (f32, [f32; 3]) {
     (self.get_value(x, y, z), self.get_gradient(x, y, z))
-  }
-
-  /// Fill a chunk based on bounds in this density
-  pub fn fill_chunk<Chunk, Value>(
-    &self,
-    chunk: &mut Chunk,
-    fill: Value,
-    bounds: &([f32; 3], [f32; 3]),
-    isovalue: f32,
-  ) where
-    Chunk: ChunkifyMut<Value> + Sizable,
-    Value: Clone,
-  {
-    let (min, max) = bounds;
-    let size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
-    let dimensions = [
-      chunk.width() as usize,
-      chunk.height() as usize,
-      chunk.depth() as usize,
-    ];
-    let delta = [
-      size[0] / (dimensions[0] - 1) as f32,
-      size[1] / (dimensions[1] - 1) as f32,
-      size[2] / (dimensions[2] - 1) as f32,
-    ];
-    for i in 0..dimensions[0] {
-      let x = min[0] + i as f32 * delta[0];
-      for j in 0..dimensions[1] {
-        let y = min[1] + j as f32 * delta[1];
-        for k in 0..dimensions[2] {
-          let z = min[2] + k as f32 * delta[2];
-          let value = self.get_value(x, y, z);
-          if value > isovalue {
-            // println!("Filling");
-            chunk.set(i, j, k, fill.clone());
-          }
-        }
-      }
-    }
   }
 }

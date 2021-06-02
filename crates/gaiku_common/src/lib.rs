@@ -9,7 +9,7 @@ pub use mint;
 
 use crate::{
   boxify::*,
-  chunk::{Chunkify, ChunkifyMut},
+  chunk::{Atlasify, AtlasifyMut, Chunkify, ChunkifyMut},
   mesh::Meshify,
   texture::{TextureAtlas2d, Texturify2d},
 };
@@ -33,7 +33,7 @@ pub mod density;
 pub mod prelude {
   pub use crate::{
     boxify::*,
-    chunk::{Chunkify, ChunkifyMut},
+    chunk::{Atlasify, AtlasifyMut, Chunkify, ChunkifyMut},
     mesh::{MeshBuilder, Meshify},
     texture::{TextureAtlas2d, Texturify2d},
     Baker, BakerOptions, FileFormat,
@@ -64,10 +64,14 @@ where
 /// Baker is a trait used to define a chunk to mesh converter
 pub trait Baker {
   type Value;
+  type AtlasValue;
+  type Coord;
 
   fn bake<C, T, M>(chunk: &C, options: &BakerOptions<T>) -> Result<Option<M>>
   where
-    C: Chunkify<Self::Value> + Sizable,
+    C: Chunkify<Self::Coord, Self::Value>
+      + Sizable<Self::Coord>
+      + Atlasify<Self::Coord, Self::AtlasValue>,
     T: Texturify2d,
     M: Meshify;
 }
@@ -75,15 +79,24 @@ pub trait Baker {
 /// FileFormat is a trait used to define a {file extension} to chunk converter
 pub trait FileFormat {
   type Value;
+  type AtlasValue;
+  type Coord;
+  type OriginCoord;
 
   fn load<C, T>(bytes: Vec<u8>) -> Result<(Vec<C>, Option<TextureAtlas2d<T>>)>
   where
-    C: Chunkify<Self::Value> + ChunkifyMut<Self::Value> + Boxify,
+    C: Chunkify<Self::Coord, Self::Value>
+      + ChunkifyMut<Self::Coord, Self::Value>
+      + Boxify<Self::OriginCoord, Self::Coord>
+      + AtlasifyMut<Self::Coord, Self::AtlasValue>,
     T: Texturify2d;
 
   fn read<C, T>(file: &str) -> Result<(Vec<C>, Option<TextureAtlas2d<T>>)>
   where
-    C: Chunkify<Self::Value> + ChunkifyMut<Self::Value> + Boxify,
+    C: Chunkify<Self::Coord, Self::Value>
+      + ChunkifyMut<Self::Coord, Self::Value>
+      + Boxify<Self::OriginCoord, Self::Coord>
+      + AtlasifyMut<Self::Coord, Self::AtlasValue>,
     T: Texturify2d,
   {
     let bytes = read(file)?;

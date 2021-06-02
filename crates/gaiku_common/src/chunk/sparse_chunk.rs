@@ -15,20 +15,20 @@ pub struct SparseChunk {
   width: u16,
   height: u16,
   depth: u16,
-  data: HashMap<(usize, usize, usize), u8>,
+  data: HashMap<(u16, u16, u16), u8>,
 }
 
-impl Chunkify<u8> for SparseChunk {
-  fn is_air(&self, x: usize, y: usize, z: usize) -> bool {
+impl Chunkify<u16, u8> for SparseChunk {
+  fn is_air(&self, x: u16, y: u16, z: u16) -> bool {
     self.get(x, y, z) == 0
   }
 
-  fn get(&self, x: usize, y: usize, z: usize) -> u8 {
+  fn get(&self, x: u16, y: u16, z: u16) -> u8 {
     *self.data.get(&(x, y, z)).unwrap_or(&0)
   }
 }
 
-impl Sizable for SparseChunk {
+impl Sizable<u16> for SparseChunk {
   fn with_size(width: u16, height: u16, depth: u16) -> Self {
     Self {
       width,
@@ -51,8 +51,8 @@ impl Sizable for SparseChunk {
   }
 }
 
-impl ChunkifyMut<u8> for SparseChunk {
-  fn set(&mut self, x: usize, y: usize, z: usize, value: u8) {
+impl ChunkifyMut<u16, u8> for SparseChunk {
+  fn set(&mut self, x: u16, y: u16, z: u16, value: u8) {
     self.data.insert((x, y, z), value);
   }
 }

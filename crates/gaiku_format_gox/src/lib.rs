@@ -8,11 +8,17 @@ pub struct GoxReader;
 
 // TODO: The generated data appears rotated, need to rotate from back to bottom
 impl FileFormat for GoxReader {
-  type Value = (u8, u8);
+  type Value = u8;
+  type AtlasValue = u8;
+  type Coord = u16;
+  type OriginCoord = f32;
 
   fn load<C, T>(bytes: Vec<u8>) -> Result<(Vec<C>, Option<TextureAtlas2d<T>>)>
   where
-    C: Chunkify<Self::Value> + ChunkifyMut<Self::Value> + Boxify,
+    C: Chunkify<Self::Coord, Self::Value>
+      + ChunkifyMut<Self::Coord, Self::Value>
+      + Boxify<Self::OriginCoord, Self::Coord>
+      + AtlasifyMut<Self::Coord, Self::AtlasValue>,
     T: Texturify2d,
   {
     let gox = Gox::from_bytes(bytes, vec![Only::Layers, Only::Blocks]);
@@ -32,7 +38,16 @@ impl FileFormat for GoxReader {
           if !layer.blocks.is_empty() {
             for data in layer.blocks.iter() {
               let block_colors = block_data[data.block_index];
-              let mut chunk = C::new([data.x as f32, data.z as f32, data.y as f32], 16, 16, 16);
+              let mut chunk = C::new(
+                [
+                  data.x as Self::OriginCoord,
+                  data.z as Self::OriginCoord,
+                  data.y as Self::OriginCoord,
+                ],
+                16,
+                16,
+                16,
+              );
 
               for x in 0..chunk.width() as usize {
                 for y in 0..chunk.height() as usize {
@@ -54,7 +69,13 @@ impl FileFormat for GoxReader {
                       };
 
                       if index <= std::u8::MAX as usize {
-                        chunk.set(x, z, y, (index as u8, 255));
+                        chunk.set(x as Self::Coord, z as Self::Coord, y as Self::Coord, 255);
+                        chunk.set_atlas(
+                          x as Self::Coord,
+                          z as Self::Coord,
+                          y as Self::Coord,
+                          index as Self::AtlasValue,
+                        );
                       }
                     }
                   }
