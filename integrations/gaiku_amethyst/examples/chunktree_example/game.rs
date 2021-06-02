@@ -170,7 +170,7 @@ impl GameLoad {
 
     let levels: usize = 8;
     println!("Building tree with {} levels", levels);
-    let chunktree = ChunkTree::<MetaChunk, (u8, u8)>::new(bounds.clone(), levels);
+    let chunktree = ChunkTree::<MetaChunk>::new(bounds.clone(), levels);
     world.insert(chunktree);
     world.insert(density);
   }
@@ -191,7 +191,7 @@ impl GameLoad {
     // Now either create or unhide
     type SystemData<'s> = (
       Entities<'s>,
-      WriteExpect<'s, ChunkTree<MetaChunk, (u8, u8)>>,
+      WriteExpect<'s, ChunkTree<MetaChunk>>,
       ReadExpect<'s, Loader>,
       ReadExpect<'s, DensityData>,
       ReadExpect<'s, MaterialDefaults>,
@@ -246,7 +246,7 @@ impl GameLoad {
             //   visible_lod.get_center()
             // );
             // Create
-            if visible_lod.get_chunk().is_none() {
+            if visible_lod.get_data().is_none() {
               // println!("Making chunk");
               let mut chunk = MetaChunk::with_size(
                 chunk_dimensions[0],
@@ -335,9 +335,9 @@ impl GameLoad {
               chunk.set_entity(entity);
               self.visible_entities.push(entity.clone());
 
-              visible_lod.set_chunk(chunk);
+              visible_lod.set_data(chunk);
             } else {
-              if let Some(ent) = visible_lod.get_chunk().and_then(|c| c.get_entity()) {
+              if let Some(ent) = visible_lod.get_data().and_then(|c| c.get_entity()) {
                 hidden_storage.remove(ent);
                 self.visible_entities.push(ent.clone());
               }

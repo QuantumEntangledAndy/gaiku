@@ -1,20 +1,9 @@
-use crate::prelude::*;
-
-use std::marker::PhantomData;
-
-pub struct ChunkTreeLeaf<Chunk, Data> {
-  // required because we want to have Chunk<Data>
-  _marker: PhantomData<Data>,
-
+pub struct ChunkTreeLeaf<Data> {
   /// Bounds represents the desired size of the domain in (min, max)
   bounds: ([f32; 3], [f32; 3]),
 
-  /// The chunk data for this LOD level
-  chunk: Option<Chunk>,
-
-  /// This bool controls if this LOD is visible according to the desired screen space error
-  /// It gets updated by calling update_lod_visibility
-  visible: bool,
+  /// Arbitary data for this LOD level
+  data: Option<Data>,
 
   /// LOD Level 0 is highest detail
   level: usize,
@@ -25,8 +14,11 @@ pub struct ChunkTreeLeaf<Chunk, Data> {
 /// lowest LOD
 /// Subsequent levels hold the higher detail LODS at higher
 // resolutions, up to the number of desired LODS.
-pub struct ChunkTree<Chunk, Data> {
-  value: ChunkTreeLeaf<Chunk, Data>,
+// Values are held in a leaf so that we can iter them.
+// Originally both children and data were on the same struct
+// but this causes issues with who owns the data during an iter
+pub struct ChunkTree<Data> {
+  value: ChunkTreeLeaf<Data>,
   /// Octtree children with order
   /// bottom_front_left
   /// bottom_front_right
@@ -36,27 +28,24 @@ pub struct ChunkTree<Chunk, Data> {
   /// top_front_right
   /// top_back_right
   /// top_back_left
-  children: Vec<ChunkTree<Chunk, Data>>,
+  children: Vec<ChunkTree<Data>>,
 }
 
-impl<Chunk, Data> ChunkTree<Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
+impl<Data> ChunkTree<Data> {
   pub fn get_bounds(&self) -> &([f32; 3], [f32; 3]) {
     self.value.get_bounds()
   }
 
-  pub fn set_chunk(&mut self, chunk: Chunk) {
-    self.value.set_chunk(chunk)
+  pub fn set_data(&mut self, data: Data) {
+    self.value.set_data(data)
   }
 
-  pub fn get_chunk(&self) -> Option<&Chunk> {
-    self.value.get_chunk()
+  pub fn get_data(&self) -> Option<&Data> {
+    self.value.get_data()
   }
 
-  pub fn get_chunk_mut(&mut self) -> Option<&mut Chunk> {
-    self.value.get_chunk_mut()
+  pub fn get_data_mut(&mut self) -> Option<&mut Data> {
+    self.value.get_data_mut()
   }
 
   pub fn get_center(&self) -> [f32; 3] {
@@ -76,11 +65,7 @@ where
     self.value.get_level()
   }
 
-  pub fn is_visible(&self) -> bool {
-    self.value.is_visible()
-  }
-
-  pub fn new(bounds: ([f32; 3], [f32; 3]), levels: usize) -> ChunkTree<Chunk, Data> {
+  pub fn new(bounds: ([f32; 3], [f32; 3]), levels: usize) -> ChunkTree<Data> {
     let new_children = if levels > 0 {
       let new_levels = levels - 1;
       let (min, max) = bounds;
@@ -113,40 +98,33 @@ where
     }
   }
 
-  /// This works but is really slow for large LODs
-  // For example if there are 8 levels there are 8^8=16,777,216 LOD0's
-  // A better algorithm would not need to visit all lods
-  pub fn update_lod_visibility(&mut self, camera_position: &[f32; 3], lod_distance: f32) {
-    for child in self.iter_mut() {
-      let center = child.get_center();
-      let d = ((center[0] - camera_position[0]).powi(2)
-        + (center[1] - camera_position[1]).powi(2)
-        + (center[2] - camera_position[2]).powi(2))
-      .sqrt();
-      let lod: usize = ((d / lod_distance).ln() / 2_f32.ln()).floor() as usize;
-      child.visible = child.get_level() == lod;
-    }
-  }
-
-  /// This is a more effecient way of getting the visible LODs then calling
-  /// update_lod_visibility as it dosent need to visit every node
+  /// An iter on the visible LODs
+  /// lod_distance represents a scaling factor for the lod transition point
+  /// The lods transition at lod_distance*(2^(level))
+  // TODO: add an iter for lod_distance*(a^(level)) where a is an input variable
+  //       this would be nice as then we can get more control
   pub fn get_visible_lods<'b>(
     &self,
     camera_position: &'b [f32; 3],
     lod_distance: f32,
-  ) -> ChunkTreeVisibleIter<'_, 'b, Chunk, Data> {
+  ) -> ChunkTreeVisibleIter<'_, 'b, Data> {
     ChunkTreeVisibleIter::new(self, camera_position, lod_distance)
   }
 
+  /// A mutable iter on the visible LODs
+  /// lod_distance represents a scaling factor for the lod transition point
+  /// The lods transition at lod_distance*(2^(level))
   pub fn get_visible_lods_mut<'b>(
     &mut self,
     camera_position: &'b [f32; 3],
     lod_distance: f32,
-  ) -> ChunkTreeVisibleIterMut<'_, 'b, Chunk, Data> {
+  ) -> ChunkTreeVisibleIterMut<'_, 'b, Data> {
     ChunkTreeVisibleIterMut::new(self, camera_position, lod_distance)
   }
 
-  pub fn at_path(&self, path: &[usize]) -> Option<&ChunkTreeLeaf<Chunk, Data>> {
+  /// Given a path such as [0,1,5] get the child node at
+  /// self.children[0].children[1].children[5]
+  pub fn at_path(&self, path: &[usize]) -> Option<&ChunkTreeLeaf<Data>> {
     if path.len() == 0 {
       Some(&self.value)
     } else {
@@ -159,7 +137,9 @@ where
     }
   }
 
-  pub fn at_path_mut(&mut self, path: &[usize]) -> Option<&mut ChunkTreeLeaf<Chunk, Data>> {
+  /// Given a path such as [0,1,5] get the child node at
+  /// self.children[0].children[1].children[5] mutably
+  pub fn at_path_mut(&mut self, path: &[usize]) -> Option<&mut ChunkTreeLeaf<Data>> {
     if path.len() == 0 {
       Some(&mut self.value)
     } else {
@@ -172,33 +152,31 @@ where
     }
   }
 
-  pub fn iter(&self) -> ChunkTreeIter<'_, Chunk, Data> {
+  /// Iters over all leafs in the tree
+  pub fn iter(&self) -> ChunkTreeIter<'_, Data> {
     ChunkTreeIter::new(self)
   }
 
-  pub fn iter_mut(&mut self) -> ChunkTreeIterMut<'_, Chunk, Data> {
+  pub fn iter_mut(&mut self) -> ChunkTreeIterMut<'_, Data> {
     ChunkTreeIterMut::new(self)
   }
 }
 
-impl<Chunk, Data> ChunkTreeLeaf<Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
+impl<Data> ChunkTreeLeaf<Data> {
   pub fn get_bounds(&self) -> &([f32; 3], [f32; 3]) {
     &self.bounds
   }
 
-  pub fn set_chunk(&mut self, chunk: Chunk) {
-    self.chunk = Some(chunk);
+  pub fn set_data(&mut self, data: Data) {
+    self.data = Some(data);
   }
 
-  pub fn get_chunk(&self) -> Option<&Chunk> {
-    self.chunk.as_ref()
+  pub fn get_data(&self) -> Option<&Data> {
+    self.data.as_ref()
   }
 
-  pub fn get_chunk_mut(&mut self) -> Option<&mut Chunk> {
-    self.chunk.as_mut()
+  pub fn get_data_mut(&mut self) -> Option<&mut Data> {
+    self.data.as_mut()
   }
 
   pub fn get_center(&self) -> [f32; 3] {
@@ -225,42 +203,30 @@ where
     self.level
   }
 
-  pub fn is_visible(&self) -> bool {
-    self.visible
-  }
-
-  fn new(bounds: ([f32; 3], [f32; 3]), levels: usize) -> ChunkTreeLeaf<Chunk, Data> {
-    let chunk: Option<Chunk> = None;
+  fn new(bounds: ([f32; 3], [f32; 3]), levels: usize) -> ChunkTreeLeaf<Data> {
+    let data: Option<Data> = None;
 
     let leaf = ChunkTreeLeaf {
       bounds: bounds,
-      chunk,
-      _marker: PhantomData,
-      visible: false,
+      data,
       level: levels,
     };
     leaf
   }
 }
 
-pub struct ChunkTreeIter<'a, Chunk, Data> {
-  stack: Vec<&'a ChunkTree<Chunk, Data>>,
+pub struct ChunkTreeIter<'a, Data> {
+  stack: Vec<&'a ChunkTree<Data>>,
 }
 
-impl<'a, Chunk, Data> ChunkTreeIter<'a, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
-  fn new(tree: &'a ChunkTree<Chunk, Data>) -> ChunkTreeIter<'a, Chunk, Data> {
+impl<'a, Data> ChunkTreeIter<'a, Data> {
+  fn new(tree: &'a ChunkTree<Data>) -> ChunkTreeIter<'a, Data> {
     ChunkTreeIter { stack: vec![tree] }
   }
 }
 
-impl<'a, Chunk, Data> Iterator for ChunkTreeIter<'a, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
-  type Item = &'a ChunkTreeLeaf<Chunk, Data>;
+impl<'a, Data> Iterator for ChunkTreeIter<'a, Data> {
+  type Item = &'a ChunkTreeLeaf<Data>;
 
   fn next(&mut self) -> Option<Self::Item> {
     let node = self.stack.pop()?;
@@ -271,24 +237,18 @@ where
   }
 }
 
-pub struct ChunkTreeIterMut<'a, Chunk, Data> {
-  stack: Vec<&'a mut ChunkTree<Chunk, Data>>,
+pub struct ChunkTreeIterMut<'a, Data> {
+  stack: Vec<&'a mut ChunkTree<Data>>,
 }
 
-impl<'a, Chunk, Data> ChunkTreeIterMut<'a, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
-  fn new(tree: &'a mut ChunkTree<Chunk, Data>) -> ChunkTreeIterMut<'a, Chunk, Data> {
+impl<'a, Data> ChunkTreeIterMut<'a, Data> {
+  fn new(tree: &'a mut ChunkTree<Data>) -> ChunkTreeIterMut<'a, Data> {
     ChunkTreeIterMut { stack: vec![tree] }
   }
 }
 
-impl<'a, Chunk, Data> Iterator for ChunkTreeIterMut<'a, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
-  type Item = &'a mut ChunkTreeLeaf<Chunk, Data>;
+impl<'a, Data> Iterator for ChunkTreeIterMut<'a, Data> {
+  type Item = &'a mut ChunkTreeLeaf<Data>;
 
   fn next(&mut self) -> Option<Self::Item> {
     let node = self.stack.pop()?;
@@ -299,21 +259,18 @@ where
   }
 }
 
-pub struct ChunkTreeVisibleIter<'a, 'b, Chunk, Data> {
-  stack: Vec<&'a ChunkTree<Chunk, Data>>,
+pub struct ChunkTreeVisibleIter<'a, 'b, Data> {
+  stack: Vec<&'a ChunkTree<Data>>,
   camera_position: &'b [f32; 3],
   lod_distance: f32,
 }
 
-impl<'a, 'b, Chunk, Data> ChunkTreeVisibleIter<'a, 'b, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
+impl<'a, 'b, Data> ChunkTreeVisibleIter<'a, 'b, Data> {
   fn new(
-    tree: &'a ChunkTree<Chunk, Data>,
+    tree: &'a ChunkTree<Data>,
     camera_position: &'b [f32; 3],
     lod_distance: f32,
-  ) -> ChunkTreeVisibleIter<'a, 'b, Chunk, Data> {
+  ) -> ChunkTreeVisibleIter<'a, 'b, Data> {
     ChunkTreeVisibleIter {
       stack: vec![tree],
       camera_position,
@@ -322,11 +279,8 @@ where
   }
 }
 
-impl<'a, 'b, Chunk, Data> Iterator for ChunkTreeVisibleIter<'a, 'b, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
-  type Item = &'a ChunkTreeLeaf<Chunk, Data>;
+impl<'a, 'b, Data> Iterator for ChunkTreeVisibleIter<'a, 'b, Data> {
+  type Item = &'a ChunkTreeLeaf<Data>;
 
   fn next(&mut self) -> Option<Self::Item> {
     loop {
@@ -352,21 +306,18 @@ where
   }
 }
 
-pub struct ChunkTreeVisibleIterMut<'a, 'b, Chunk, Data> {
-  stack: Vec<&'a mut ChunkTree<Chunk, Data>>,
+pub struct ChunkTreeVisibleIterMut<'a, 'b, Data> {
+  stack: Vec<&'a mut ChunkTree<Data>>,
   camera_position: &'b [f32; 3],
   lod_distance: f32,
 }
 
-impl<'a, 'b, Chunk, Data> ChunkTreeVisibleIterMut<'a, 'b, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
+impl<'a, 'b, Data> ChunkTreeVisibleIterMut<'a, 'b, Data> {
   fn new(
-    tree: &'a mut ChunkTree<Chunk, Data>,
+    tree: &'a mut ChunkTree<Data>,
     camera_position: &'b [f32; 3],
     lod_distance: f32,
-  ) -> ChunkTreeVisibleIterMut<'a, 'b, Chunk, Data> {
+  ) -> ChunkTreeVisibleIterMut<'a, 'b, Data> {
     ChunkTreeVisibleIterMut {
       stack: vec![tree],
       camera_position,
@@ -375,11 +326,8 @@ where
   }
 }
 
-impl<'a, 'b, Chunk, Data> Iterator for ChunkTreeVisibleIterMut<'a, 'b, Chunk, Data>
-where
-  Chunk: Chunkify<Data>,
-{
-  type Item = &'a mut ChunkTreeLeaf<Chunk, Data>;
+impl<'a, 'b, Data> Iterator for ChunkTreeVisibleIterMut<'a, 'b, Data> {
+  type Item = &'a mut ChunkTreeLeaf<Data>;
 
   fn next(&mut self) -> Option<Self::Item> {
     loop {
