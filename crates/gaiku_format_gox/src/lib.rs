@@ -37,21 +37,22 @@ impl FileFormat for GoxReader {
         for layer in layers.iter() {
           if !layer.blocks.is_empty() {
             for data in layer.blocks.iter() {
+              let border: usize = 1;
               let block_colors = block_data[data.block_index];
               let mut chunk = C::new(
                 [
-                  data.x as Self::OriginCoord,
-                  data.z as Self::OriginCoord,
-                  data.y as Self::OriginCoord,
+                  (data.x - border as i32) as Self::OriginCoord,
+                  (data.z - border as i32) as Self::OriginCoord,
+                  (data.y - border as i32) as Self::OriginCoord,
                 ],
-                16,
-                16,
-                16,
+                (16 + border * 2) as Self::Coord,
+                (16 + border * 2) as Self::Coord,
+                (16 + border * 2) as Self::Coord,
               );
 
-              for x in 0..chunk.width() as usize {
-                for y in 0..chunk.height() as usize {
-                  for z in 0..chunk.depth() as usize {
+              for x in 0..chunk.width() as usize - border * 2 {
+                for y in 0..chunk.height() as usize - border * 2 {
+                  for z in 0..chunk.depth() as usize - border * 2 {
                     if !block_colors.is_empty(x, y, z) {
                       let color = block_colors.get_pixel(x, y, z);
                       let index = if let Some((index, _)) =
@@ -69,11 +70,16 @@ impl FileFormat for GoxReader {
                       };
 
                       if index <= std::u8::MAX as usize {
-                        chunk.set(x as Self::Coord, z as Self::Coord, y as Self::Coord, 255);
+                        chunk.set(
+                          (x + border) as Self::Coord,
+                          (z + border) as Self::Coord,
+                          (y + border) as Self::Coord,
+                          1,
+                        );
                         chunk.set_atlas(
-                          x as Self::Coord,
-                          z as Self::Coord,
-                          y as Self::Coord,
+                          (x + border) as Self::Coord,
+                          (z + border) as Self::Coord,
+                          (y + border) as Self::Coord,
                           index as Self::AtlasValue,
                         );
                       }
