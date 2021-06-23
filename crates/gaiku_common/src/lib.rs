@@ -24,7 +24,7 @@ pub mod mesh;
 /// Texture related traits/implementation.
 pub mod texture;
 //mod tree;
-/// Chunk tree is used for lods and neighbours
+/// Chunk tree is used for lods
 pub mod chunktree;
 /// Density is used for sampled 3d density maps
 pub mod density;
@@ -45,7 +45,8 @@ pub struct BakerOptions<T>
 where
   T: Texturify2d,
 {
-  pub level_of_detail: usize,
+  pub level_of_detail: f32,
+  pub isovalue: f32,
   pub texture: Option<TextureAtlas2d<T>>,
 }
 
@@ -55,7 +56,8 @@ where
 {
   fn default() -> Self {
     Self {
-      level_of_detail: 1,
+      level_of_detail: 1.,
+      isovalue: 0.5,
       texture: None,
     }
   }
