@@ -17,6 +17,7 @@ use amethyst::{
     palette::{rgb::Rgb, Srgb},
     plugins::{RenderShaded3D, RenderSkybox, RenderToWindow},
     types::{DefaultBackend, TextureData},
+    visibility::BoundingSphere,
     ActiveCamera, Camera, Material, MaterialDefaults, Mesh, RenderingBundle,
   },
   ui::{RenderUi, UiBundle},
@@ -134,8 +135,13 @@ impl GameLoad {
 
     for chunk in chunks.iter() {
       let mesh = VoxelBaker::bake::<Chunk, GaikuTexture2d, GaikuMesh>(chunk, &options).unwrap();
+      let dimension = [
+        chunk.width() as f32,
+        chunk.height() as f32,
+        chunk.depth() as f32,
+      ];
       if let Some(mesh) = mesh {
-        meshes.push((mesh, chunk.position()));
+        meshes.push((mesh, chunk.position(), dimension));
       }
     }
 
@@ -147,7 +153,7 @@ impl GameLoad {
     } else {
       Matrix4::identity()
     };
-    for (mut mesh_gox, position) in meshes {
+    for (mut mesh_gox, position, dimension) in meshes {
       let (mesh, mat) = {
         if swap_axes {
           // Swap y/z for amethyst coordinate system
@@ -200,7 +206,20 @@ impl GameLoad {
       pos.set_translation(position_trans);
       pos.set_scale(scale);
 
-      let _voxel = world.create_entity().with(mesh).with(mat).with(pos).build();
+      let radius =
+        (dimension[0].powi(2) + dimension[1].powi(2) + dimension[2].powi(2)).sqrt() * 1.5;
+      let bounding = BoundingSphere {
+        center: [dimension[0] / 2., dimension[1] / 2., dimension[2] / 2.].into(),
+        radius,
+      };
+
+      let _voxel = world
+        .create_entity()
+        .with(mesh)
+        .with(mat)
+        .with(pos)
+        .with(bounding)
+        .build();
     }
   }
 }
