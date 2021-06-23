@@ -15,7 +15,6 @@ pub struct Chunk {
   height: u16,
   depth: u16,
   values: Vec<(u8, u8)>,
-  bounds: ([u16; 3], [u16; 3]),
 }
 
 impl Chunk {
@@ -43,7 +42,6 @@ impl Boxify<f32, u16> for Chunk {
       height,
       depth,
       values: vec![(0, 0); depth as usize * height as usize * width as usize],
-      bounds: ([0, 0, 0], [width - 1, depth - 1, height - 1]),
     }
   }
 }
