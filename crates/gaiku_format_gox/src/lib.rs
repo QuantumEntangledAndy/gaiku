@@ -32,27 +32,90 @@ impl FileFormat for GoxReader {
       }
     }
 
+    let mut starts = vec![];
     for data in gox.data.iter() {
       if let Data::Layers(layers, _bounds) = &data {
         for layer in layers.iter() {
           if !layer.blocks.is_empty() {
             for data in layer.blocks.iter() {
-              let border: usize = 1;
-              let block_colors = block_data[data.block_index];
-              let mut chunk = C::new(
-                [
-                  (data.x - border as i32) as Self::OriginCoord,
-                  (data.z - border as i32) as Self::OriginCoord,
-                  (data.y - border as i32) as Self::OriginCoord,
-                ],
-                (16 + border * 2) as Self::Coord,
-                (16 + border * 2) as Self::Coord,
-                (16 + border * 2) as Self::Coord,
-              );
+              starts.push([data.x, data.y, data.z]);
+            }
+          }
+        }
+      }
+    }
+    let init_coord = starts[0];
 
-              for x in 0..chunk.width() as usize - border * 2 {
-                for y in 0..chunk.height() as usize - border * 2 {
-                  for z in 0..chunk.depth() as usize - border * 2 {
+    let min = [
+      starts
+        .iter()
+        .fold(init_coord[0], |acc, c| if c[0] < acc { c[0] } else { acc }),
+      starts
+        .iter()
+        .fold(init_coord[1], |acc, c| if c[1] < acc { c[1] } else { acc }),
+      starts
+        .iter()
+        .fold(init_coord[2], |acc, c| if c[2] < acc { c[2] } else { acc }),
+    ];
+    let max = [
+      starts.iter().fold(init_coord[0] + 16, |acc, c| {
+        if c[0] + 16 > acc {
+          c[0] + 16
+        } else {
+          acc
+        }
+      }),
+      starts.iter().fold(init_coord[1] + 16, |acc, c| {
+        if c[1] + 16 > acc {
+          c[1] + 16
+        } else {
+          acc
+        }
+      }),
+      starts.iter().fold(init_coord[2] + 16, |acc, c| {
+        if c[2] + 16 > acc {
+          c[2] + 16
+        } else {
+          acc
+        }
+      }),
+    ];
+
+    let chunk_size: [Self::Coord; 3] = [
+      (max[0] - min[0] + 1).try_into().unwrap(),
+      (max[1] - min[1] + 1).try_into().unwrap(),
+      (max[2] - min[2] + 1).try_into().unwrap(),
+    ];
+
+    let mut chunk = C::new(
+      [
+        (min[0]) as Self::OriginCoord,
+        (min[2]) as Self::OriginCoord,
+        (min[1]) as Self::OriginCoord,
+      ],
+      chunk_size[0],
+      chunk_size[2], // goxel is in y up gaiku in zup
+      chunk_size[1],
+    );
+
+    for data in gox.data.iter() {
+      if let Data::Layers(layers, _bounds) = &data {
+        for layer in layers.iter() {
+          if !layer.blocks.is_empty() {
+            for data in layer.blocks.iter() {
+              let block_colors = block_data[data.block_index];
+              let origin: [Self::Coord; 3] = [
+                (data.x - min[0]).try_into().unwrap(),
+                (data.y - min[1]).try_into().unwrap(),
+                (data.z - min[2]).try_into().unwrap(),
+              ];
+
+              for x in 0..16 {
+                let x_c = x as Self::Coord + origin[0];
+                for y in 0..16 {
+                  let y_c = y as Self::Coord + origin[1];
+                  for z in 0..16 {
+                    let z_c = z as Self::Coord + origin[2];
                     if !block_colors.is_empty(x, y, z) {
                       let color = block_colors.get_pixel(x, y, z);
                       let index = if let Some((index, _)) =
@@ -70,30 +133,20 @@ impl FileFormat for GoxReader {
                       };
 
                       if index <= std::u8::MAX as usize {
-                        chunk.set(
-                          (x + border) as Self::Coord,
-                          (z + border) as Self::Coord,
-                          (y + border) as Self::Coord,
-                          1,
-                        );
-                        chunk.set_atlas(
-                          (x + border) as Self::Coord,
-                          (z + border) as Self::Coord,
-                          (y + border) as Self::Coord,
-                          index as Self::AtlasValue,
-                        );
+                        chunk.set(x_c, z_c, y_c, 1); // goxel is in y up gaiku in zup
+                        chunk.set_atlas(x_c, z_c, y_c, index as Self::AtlasValue);
                       }
                     }
                   }
                 }
               }
-
-              result.push(chunk);
             }
           }
         }
       }
     }
+
+    result.push(chunk);
 
     if !colors.is_empty() {
       let mut atlas = TextureAtlas2d::new(1);
