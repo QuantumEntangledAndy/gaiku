@@ -84,9 +84,9 @@ impl Baker for DensityVoxelBaker {
             ],
           };
 
-          let triangles_atlas = grid.polygonize(isovalue);
+          let polys = grid.polygonize(isovalue);
 
-          for (vertex, corner) in triangles_atlas {
+          for (vertex, face_uvs, corner) in polys {
             let normal = compute_normal(&vertex);
 
             let atlas = match corner {
@@ -102,7 +102,6 @@ impl Baker for DensityVoxelBaker {
             };
 
             let uvs = if let Some(texture) = &options.texture {
-              let face_uvs = grid.compute_uvs(&vertex, corner);
               // Get the atlas corners
               // 3-2
               // 0-1

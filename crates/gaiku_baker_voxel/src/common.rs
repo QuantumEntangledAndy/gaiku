@@ -1,7 +1,7 @@
 use gaiku_common::mint::Vector3;
 use glam::Vec3;
 
-use super::tables::{CORNER_TABLE, EDGE_TABLE, TRIANGLE_TABLE};
+use super::tables::{CORNER_TABLE, EDGE_TABLE, TRIANGLE_TABLE, UV_TABLE};
 
 pub(crate) const EPSILON: f32 = 1e-4;
 
@@ -65,107 +65,6 @@ impl GridCell {
   //   result
   // }
 
-  /// Return the index of the corner nearest this point
-  pub(crate) fn nearest_corner(&self, point: &[f32; 3]) -> usize {
-    let dist: Vec<_> = self
-      .point
-      .iter()
-      .map(|p| vec_sum_sq(&vec_sub(point, &[p.x, p.y, p.z])))
-      .collect();
-
-    let mut i = 0;
-    for (j, &value) in dist.iter().enumerate() {
-      if value < dist[i] {
-        i = j;
-      }
-    }
-
-    i
-  }
-
-  // Now for the UVs
-  //
-  // Plan is, put vertex coordinates relative to nearest cube corner + [.5,.5,.5]
-  //
-  // Find which axis direction the normal is pointing
-  //
-  // Map uvs on that axis direction as if the face was perfectly aligned with that axis
-  //
-  // This is simlar to tri-linear shader expect that it is without the blending
-  // and only contains one map instead of three
-  //
-  // This should be fine for anything that is mostly axis aligned
-  //
-  // Caveat Emptor
-  pub(crate) fn compute_uvs(&self, vertex: &[[f32; 3]; 3], corner: i8) -> [[f32; 2]; 3] {
-    let normal = compute_normal(&vertex);
-
-    let cube_center = [
-      self.point[corner as usize].x,
-      self.point[corner as usize].y,
-      self.point[corner as usize].z,
-    ];
-    let vertex_mapped: Vec<_> = vertex
-      .iter()
-      .map(|v| {
-        let mut vertex_relative = vec_sub(v, &cube_center);
-        // Scale so that gridcell is of size 1
-        vertex_relative[0] /= self.point[6].x - self.point[0].x;
-        vertex_relative[1] /= self.point[6].y - self.point[0].y;
-        vertex_relative[2] /= self.point[6].z - self.point[0].z;
-        // Put it into the range 0..1 instead of -0.5..0.5
-        vertex_relative[0] += 0.5;
-        vertex_relative[1] += 0.5;
-        vertex_relative[2] += 0.5;
-        vertex_relative
-      })
-      .collect();
-
-    // Is the normal pointing along x, y, or z
-    // We use that to decide how to map the uvs
-    // dot product gives the cosine of the angle.
-    let cos = [
-      vec_dot(&normal, &[1., 0., 0.]),
-      vec_dot(&normal, &[0., 1., 0.]),
-      vec_dot(&normal, &[0., 0., 1.]),
-    ];
-
-    // Nearest axis alignment is this one!
-    // We take abs and find the maximum
-    let mut i = 0;
-    for (j, &value) in cos.iter().enumerate() {
-      if value > cos[i].abs() {
-        i = j;
-      }
-    }
-    let max_cos = cos[i];
-
-    let permutation = [
-      [1, 2], // If aligned with x then uv is on y,z
-      [0, 2], // If aligned with y then uv is on x,z
-      [0, 1], // If aligned with z then uv is on x,y
-    ];
-
-    // When cos < 0 we flip it (cos its facing against the axis)
-    let (j, k) = if max_cos >= 0. { (0, 1) } else { (1, 0) };
-
-    // Result time
-    [
-      [
-        vertex_mapped[0][permutation[i][j]].clamp(0., 1.),
-        vertex_mapped[0][permutation[i][k]].clamp(0., 1.),
-      ],
-      [
-        vertex_mapped[1][permutation[i][j]].clamp(0., 1.),
-        vertex_mapped[1][permutation[i][k]].clamp(0., 1.),
-      ],
-      [
-        vertex_mapped[2][permutation[i][j]].clamp(0., 1.),
-        vertex_mapped[2][permutation[i][k]].clamp(0., 1.),
-      ],
-    ]
-  }
-
   fn mid_point(&self, indices: &[usize]) -> [f32; 3] {
     let points: Vec<[f32; 3]> = indices
       .iter()
@@ -175,7 +74,7 @@ impl GridCell {
     vec_ave(points_ref)
   }
 
-  pub(crate) fn polygonize(&self, isolevel: f32) -> Vec<([[f32; 3]; 3], i8)> {
+  pub(crate) fn polygonize(&self, isolevel: f32) -> Vec<([[f32; 3]; 3], [[f32; 2]; 3], i8)> {
     let mut cube_index = 0;
     let mut vertex_list = [[0.0, 0.0, 0.0]; 19];
     let mut triangles = vec![];
@@ -373,6 +272,11 @@ impl GridCell {
           vertex_list[TRIANGLE_TABLE[cube_index][i + 1] as usize],
           vertex_list[TRIANGLE_TABLE[cube_index][i + 2] as usize],
         ],
+        [
+          UV_TABLE[cube_index][i],
+          UV_TABLE[cube_index][i + 1],
+          UV_TABLE[cube_index][i + 2],
+        ],
         corner,
       ));
 
@@ -448,10 +352,6 @@ pub(crate) fn vec_cross(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
     a[2] * b[0] - a[0] * b[2],
     a[0] * b[1] - a[1] * b[0],
   ]
-}
-
-pub(crate) fn vec_dot(a: &[f32; 3], b: &[f32; 3]) -> f32 {
-  a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
 pub(crate) fn vec_normalised(a: &[f32; 3]) -> [f32; 3] {

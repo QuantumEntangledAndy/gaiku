@@ -22,9 +22,11 @@ fn add_to_tables(
   b: bool,
   cube_index: usize,
   verts: [i8; 4],
-  atlas: i8,
+  uvs: [[f32; 2]; 4],
+  corner_idx: i8,
   edge_table: &mut [u32; 256],
   triangle_table: &mut Vec<Vec<i8>>,
+  uv_table: &mut Vec<Vec<[f32; 2]>>,
   corner_table: &mut Vec<Vec<i8>>,
 ) {
   if a != b {
@@ -34,13 +36,19 @@ fn add_to_tables(
     if a {
       // A face out
       triangle_table[cube_index].append(&mut vec![verts[0], verts[1], verts[2]]);
+      uv_table[cube_index].append(&mut vec![uvs[0], uvs[1], uvs[2]]);
       triangle_table[cube_index].append(&mut vec![verts[2], verts[1], verts[3]]);
+      uv_table[cube_index].append(&mut vec![uvs[2], uvs[1], uvs[3]]);
     } else {
       // B face outwards
       triangle_table[cube_index].append(&mut vec![verts[0], verts[2], verts[1]]);
+      uv_table[cube_index].append(&mut vec![uvs[0], uvs[2], uvs[1]]);
       triangle_table[cube_index].append(&mut vec![verts[1], verts[2], verts[3]]);
+      uv_table[cube_index].append(&mut vec![uvs[1], uvs[2], uvs[3]]);
     }
-    corner_table[cube_index].append(&mut vec![atlas, atlas, atlas, atlas, atlas, atlas]);
+    corner_table[cube_index].append(&mut vec![
+      corner_idx, corner_idx, corner_idx, corner_idx, corner_idx, corner_idx,
+    ]);
   }
 }
 
@@ -110,14 +118,18 @@ fn vec_cross(a: [i8; 3], b: [i8; 3]) -> [i8; 3] {
   ]
 }
 
-fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], u8)> {
+fn vec_dot(a: &[f32; 3], b: &[f32; 3]) -> f32 {
+  a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], [[f32; 2]; 4], u8)> {
   // All a_coord or b_coors are corner points so their values all always [0/2, 0/2, 0/2] never 1
   let mid_coord = [
     (b_coord[0] + a_coord[0]) / 2,
     (b_coord[1] + a_coord[1]) / 2,
     (b_coord[2] + a_coord[2]) / 2,
   ];
-  // Filter our diagonals and self
+  // Filter out diagonals and self
   if mid_coord
     .iter()
     .fold(0, |acc, &v| if v == 1 { acc + 1 } else { acc })
@@ -133,6 +145,7 @@ fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], u8)> {
   let axis = mid_coord.iter().position(|&i| i == 1).unwrap();
   // This permutation will give the axis direction of the other two face points
   let permutation = [[1, 2], [0, 2], [0, 1]];
+
   let c = {
     // other face point
     let i = permutation[axis][0];
@@ -143,8 +156,10 @@ fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], u8)> {
       new_c[i] += 1
     }
     new_c
-  }; // last face point
+  };
+
   let d = {
+    // last face point
     let i = permutation[axis][1];
     let mut new_d = mid_coord.clone();
     if new_d[i] + 1 > 2 {
@@ -154,6 +169,7 @@ fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], u8)> {
     }
     new_d
   };
+
   // A face is made from mid, c, d, and center (center is at [1,1,1])
   // But which way should point outwards?
   // We use the cross product to find out
@@ -171,6 +187,57 @@ fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], u8)> {
     result = [mid_coord, c, d, [1, 1, 1]];
     corner = 1;
   }
+
+  let normal = [-cross[0] as f32, -cross[1] as f32, -cross[2] as f32];
+  let face_center = [
+    result.iter().fold(0, |acc, v| acc + v[0]) as f32 / 4. / 2.,
+    result.iter().fold(0, |acc, v| acc + v[1]) as f32 / 4. / 2.,
+    result.iter().fold(0, |acc, v| acc + v[2]) as f32 / 4. / 2.,
+  ];
+
+  let face_origin = [
+    (face_center[0] + 0.5).floor() - 0.5,
+    (face_center[1] + 0.5).floor() - 0.5,
+    (face_center[2] + 0.5).floor() - 0.5,
+  ];
+
+  // Is the normal pointing along x, y, or z
+  // We use that to decide how to map the uvs
+  // dot product gives the cosine of the angle
+  // between.
+  let cos = [
+    vec_dot(&normal, &[1., 0., 0.]),
+    vec_dot(&normal, &[0., 1., 0.]),
+    vec_dot(&normal, &[0., 0., 1.]),
+  ];
+
+  // Nearest axis alignment is this one!
+  // We take abs and find the maximum
+  let mut i = 0;
+  for (j, &value) in cos.iter().enumerate() {
+    if value > cos[i].abs() {
+      i = j;
+    }
+  }
+  let max_cos = cos[i];
+  let uv_invert = max_cos < 0.;
+  let uv_axis = permutation[i];
+  let uvs: Vec<_> = result
+    .iter()
+    .map(|v| {
+      [
+        match uv_invert {
+          false => v[uv_axis[0]] as f32 / 2. - face_origin[uv_axis[0]],
+          true => 1. - (v[uv_axis[0]] as f32 / 2. - face_origin[uv_axis[0]]),
+        },
+        match uv_invert {
+          false => v[uv_axis[1]] as f32 / 2. - face_origin[uv_axis[1]],
+          true => 1. - (v[uv_axis[1]] as f32 / 2. - face_origin[uv_axis[1]]),
+        },
+      ]
+    })
+    .collect();
+
   Some((
     [
       *VERT_MAP.get(&result[0]).unwrap(),
@@ -178,6 +245,7 @@ fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], u8)> {
       *VERT_MAP.get(&result[2]).unwrap(),
       *VERT_MAP.get(&result[3]).unwrap(),
     ],
+    uvs.try_into().unwrap(),
     corner,
   ))
 }
@@ -186,6 +254,7 @@ fn main() {
   let mut edge_table: [u32; 256] = [0; 256];
   let mut triangle_table: Vec<Vec<i8>> = (0..256).map(|_| vec![]).collect();
   let mut corner_table: Vec<Vec<i8>> = (0..256).map(|_| vec![]).collect();
+  let mut uv_table: Vec<Vec<[f32; 2]>> = (0..256).map(|_| vec![]).collect();
 
   for a in [false, true] {
     for b in [false, true] {
@@ -202,7 +271,7 @@ fn main() {
                     for j in (i + 1)..8 {
                       let m = values[i];
                       let n = values[j];
-                      if let Some((verts, corner_idx)) =
+                      if let Some((verts, uvs, corner_idx)) =
                         get_verts(CORNER_MAP[&(i as i8)], CORNER_MAP[&(j as i8)])
                       {
                         let corner = match corner_idx {
@@ -215,9 +284,11 @@ fn main() {
                           n,
                           cube_index,
                           verts,
+                          uvs,
                           corner.try_into().unwrap(),
                           &mut edge_table,
                           &mut triangle_table,
+                          &mut uv_table,
                           &mut corner_table,
                         );
                       }
@@ -239,10 +310,17 @@ fn main() {
   corner_table
     .iter_mut()
     .for_each(|c| c.append(&mut vec![-1; longest - c.len()]));
+  uv_table
+    .iter_mut()
+    .for_each(|c| c.append(&mut vec![[-1., -1.]; longest - c.len()]));
   println!("pub const EDGE_TABLE: [u32; 256] = {:?};", edge_table);
   println!(
     "pub const TRIANGLE_TABLE: [[i8; {}]; 256] = {:?};",
     longest, triangle_table
+  );
+  println!(
+    "pub const UV_TABLE: [[[f32;2]; {}]; 256] = {:?};",
+    longest, uv_table
   );
   println!(
     "pub const CORNER_TABLE: [[i8; {}]; 256] = {:?};",
