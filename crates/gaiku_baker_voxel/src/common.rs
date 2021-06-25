@@ -1,7 +1,7 @@
 use gaiku_common::mint::Vector3;
 use glam::Vec3;
 
-use super::tables::{EDGE_TABLE, TRIANGLE_TABLE};
+use super::tables::{CORNER_TABLE, EDGE_TABLE, TRIANGLE_TABLE};
 
 pub(crate) const EPSILON: f32 = 1e-4;
 
@@ -97,20 +97,13 @@ impl GridCell {
   // This should be fine for anything that is mostly axis aligned
   //
   // Caveat Emptor
-  pub(crate) fn compute_uvs(&self, vertex: &[[f32; 3]; 3]) -> [[f32; 2]; 3] {
+  pub(crate) fn compute_uvs(&self, vertex: &[[f32; 3]; 3], corner: i8) -> [[f32; 2]; 3] {
     let normal = compute_normal(&vertex);
 
-    let face_mid = vec_ave(vec![&vertex[0], &vertex[1], &vertex[2]]);
-    // Move the face center backwards by small amount relative to normal
-    let epsilon = vec_mult(&normal, -EPSILON);
-    let face_mid_eps = vec_add(&face_mid, &epsilon);
-    // Get the corner of the grid nearest to the face
-    let corner_idx = self.nearest_corner(&face_mid_eps);
-    // Get the verts coordinates relative to the grid corner point
     let cube_center = [
-      self.point[corner_idx].x,
-      self.point[corner_idx].y,
-      self.point[corner_idx].z,
+      self.point[corner as usize].x,
+      self.point[corner as usize].y,
+      self.point[corner as usize].z,
     ];
     let vertex_mapped: Vec<_> = vertex
       .iter()
@@ -130,8 +123,7 @@ impl GridCell {
 
     // Is the normal pointing along x, y, or z
     // We use that to decide how to map the uvs
-    // dot product gives the cosine of the angle
-    // between. We take abs and find the maximum
+    // dot product gives the cosine of the angle.
     let cos = [
       vec_dot(&normal, &[1., 0., 0.]),
       vec_dot(&normal, &[0., 1., 0.]),
@@ -139,6 +131,7 @@ impl GridCell {
     ];
 
     // Nearest axis alignment is this one!
+    // We take abs and find the maximum
     let mut i = 0;
     for (j, &value) in cos.iter().enumerate() {
       if value > cos[i].abs() {
@@ -182,7 +175,7 @@ impl GridCell {
     vec_ave(points_ref)
   }
 
-  pub(crate) fn polygonize(&self, isolevel: f32) -> Vec<[[f32; 3]; 3]> {
+  pub(crate) fn polygonize(&self, isolevel: f32) -> Vec<([[f32; 3]; 3], i8)> {
     let mut cube_index = 0;
     let mut vertex_list = [[0.0, 0.0, 0.0]; 19];
     let mut triangles = vec![];
@@ -373,11 +366,15 @@ impl GridCell {
       assert!(EDGE_TABLE[cube_index] & 2__u32.pow(TRIANGLE_TABLE[cube_index][i + 1] as u32) != 0);
       assert!(EDGE_TABLE[cube_index] & 2__u32.pow(TRIANGLE_TABLE[cube_index][i + 2] as u32) != 0);
 
-      triangles.push([
-        vertex_list[TRIANGLE_TABLE[cube_index][i] as usize],
-        vertex_list[TRIANGLE_TABLE[cube_index][i + 1] as usize],
-        vertex_list[TRIANGLE_TABLE[cube_index][i + 2] as usize],
-      ]);
+      let corner = CORNER_TABLE[cube_index][i];
+      triangles.push((
+        [
+          vertex_list[TRIANGLE_TABLE[cube_index][i] as usize],
+          vertex_list[TRIANGLE_TABLE[cube_index][i + 1] as usize],
+          vertex_list[TRIANGLE_TABLE[cube_index][i + 2] as usize],
+        ],
+        corner,
+      ));
 
       i += 3;
     }

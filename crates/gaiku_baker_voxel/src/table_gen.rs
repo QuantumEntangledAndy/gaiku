@@ -1,7 +1,7 @@
 // This is the source used to generate the tables
 
 use lazy_static::lazy_static;
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 
 fn calc_cube_index(all: &[bool; 8]) -> usize {
   let result = all.iter().enumerate().fold(0, |acc, (idx, val)| {
@@ -22,8 +22,10 @@ fn add_to_tables(
   b: bool,
   cube_index: usize,
   verts: [i8; 4],
+  atlas: i8,
   edge_table: &mut [u32; 256],
   triangle_table: &mut Vec<Vec<i8>>,
+  corner_table: &mut Vec<Vec<i8>>,
 ) {
   if a != b {
     for v in verts.iter() {
@@ -38,6 +40,7 @@ fn add_to_tables(
       triangle_table[cube_index].append(&mut vec![verts[0], verts[2], verts[1]]);
       triangle_table[cube_index].append(&mut vec![verts[1], verts[2], verts[3]]);
     }
+    corner_table[cube_index].append(&mut vec![atlas, atlas, atlas, atlas, atlas, atlas]);
   }
 }
 
@@ -107,7 +110,7 @@ fn vec_cross(a: [i8; 3], b: [i8; 3]) -> [i8; 3] {
   ]
 }
 
-fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<[i8; 4]> {
+fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<([i8; 4], u8)> {
   // All a_coord or b_coors are corner points so their values all always [0/2, 0/2, 0/2] never 1
   let mid_coord = [
     (b_coord[0] + a_coord[0]) / 2,
@@ -159,23 +162,30 @@ fn get_verts(a_coord: [i8; 3], b_coord: [i8; 3]) -> Option<[i8; 4]> {
   let cross = vec_cross(c_delta, d_delta);
   let mid_cross = vec_add(mid_coord, cross);
   let result;
+  let corner;
   if vec_eq(mid_cross, a_coord) {
     // Cross of c,d + mid == a
     result = [mid_coord, d, c, [1, 1, 1]];
+    corner = 0;
   } else {
     result = [mid_coord, c, d, [1, 1, 1]];
+    corner = 1;
   }
-  Some([
-    *VERT_MAP.get(&result[0]).unwrap(),
-    *VERT_MAP.get(&result[1]).unwrap(),
-    *VERT_MAP.get(&result[2]).unwrap(),
-    *VERT_MAP.get(&result[3]).unwrap(),
-  ])
+  Some((
+    [
+      *VERT_MAP.get(&result[0]).unwrap(),
+      *VERT_MAP.get(&result[1]).unwrap(),
+      *VERT_MAP.get(&result[2]).unwrap(),
+      *VERT_MAP.get(&result[3]).unwrap(),
+    ],
+    corner,
+  ))
 }
 
 fn main() {
   let mut edge_table: [u32; 256] = [0; 256];
   let mut triangle_table: Vec<Vec<i8>> = (0..256).map(|_| vec![]).collect();
+  let mut corner_table: Vec<Vec<i8>> = (0..256).map(|_| vec![]).collect();
 
   for a in [false, true] {
     for b in [false, true] {
@@ -192,15 +202,23 @@ fn main() {
                     for j in (i + 1)..8 {
                       let m = values[i];
                       let n = values[j];
-                      let verts = get_verts(CORNER_MAP[&(i as i8)], CORNER_MAP[&(j as i8)]);
-                      if let Some(verts) = verts {
+                      if let Some((verts, corner_idx)) =
+                        get_verts(CORNER_MAP[&(i as i8)], CORNER_MAP[&(j as i8)])
+                      {
+                        let corner = match corner_idx {
+                          0 => i,
+                          1 => j,
+                          _ => unreachable!(),
+                        };
                         add_to_tables(
                           m,
                           n,
                           cube_index,
                           verts,
+                          corner.try_into().unwrap(),
                           &mut edge_table,
                           &mut triangle_table,
+                          &mut corner_table,
                         );
                       }
                     }
@@ -218,9 +236,16 @@ fn main() {
   triangle_table
     .iter_mut()
     .for_each(|c| c.append(&mut vec![-1; longest - c.len()]));
+  corner_table
+    .iter_mut()
+    .for_each(|c| c.append(&mut vec![-1; longest - c.len()]));
   println!("pub const EDGE_TABLE: [u32; 256] = {:?};", edge_table);
   println!(
     "pub const TRIANGLE_TABLE: [[i8; {}]; 256] = {:?};",
     longest, triangle_table
+  );
+  println!(
+    "pub const CORNER_TABLE: [[i8; {}]; 256] = {:?};",
+    longest, corner_table
   );
 }

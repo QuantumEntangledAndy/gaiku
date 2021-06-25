@@ -84,19 +84,12 @@ impl Baker for DensityVoxelBaker {
             ],
           };
 
-          let triangles = grid.polygonize(isovalue);
+          let triangles_atlas = grid.polygonize(isovalue);
 
-          for vertex in triangles {
+          for (vertex, corner) in triangles_atlas {
             let normal = compute_normal(&vertex);
 
-            let face_mid = vec_ave(vec![&vertex[0], &vertex[1], &vertex[2]]);
-            // Move the face center backwards by small amount relative to normal
-            let epsilon = vec_mult(&normal, -EPSILON);
-            let face_mid_eps = vec_add(&face_mid, &epsilon);
-            // Get the corner of the grid nearest to the face
-            let corner_idx = grid.nearest_corner(&face_mid_eps);
-            // Get atlas at this corner_idx
-            let atlas = match corner_idx {
+            let atlas = match corner {
               0 => chunk.get_atlas(x, y, z),
               1 => chunk.get_atlas(x + 1., y, z),
               2 => chunk.get_atlas(x + 1., y + 1., z),
@@ -109,7 +102,7 @@ impl Baker for DensityVoxelBaker {
             };
 
             let uvs = if let Some(texture) = &options.texture {
-              let face_uvs = grid.compute_uvs(&vertex);
+              let face_uvs = grid.compute_uvs(&vertex, corner);
               // Get the atlas corners
               // 3-2
               // 0-1
