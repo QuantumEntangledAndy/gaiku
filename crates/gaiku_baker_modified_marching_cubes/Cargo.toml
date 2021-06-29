@@ -1,5 +1,5 @@
 [package]
-name = "gaiku_baker_marching_cubes"
+name = "gaiku_baker_modified_marching_cubes"
 version = "0.1.0"
 authors = [
   "Norman Paniagua <normanpaniagua@gmail.com>",

@@ -3,9 +3,9 @@ use gaiku_common::{prelude::*, Result};
 use std::convert::TryInto;
 
 /// Implementation of the marching cubes terrain generation.
-pub struct DensityMarchingCubesBaker;
+pub struct DensityModMarchingCubesBaker;
 
-impl Baker for DensityMarchingCubesBaker {
+impl Baker for DensityModMarchingCubesBaker {
   type Value = f32;
   type Coord = f32;
   type AtlasValue = u8;

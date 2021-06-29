@@ -3,11 +3,11 @@ use gaiku_common::{prelude::*, Result};
 use std::convert::TryInto;
 
 /// Implementation of the marching cubes terrain generation.
-pub struct DensityMarchingCubesBaker;
+pub struct ModMarchingCubesBaker;
 
-impl Baker for DensityMarchingCubesBaker {
-  type Value = f32;
-  type Coord = f32;
+impl Baker for ModMarchingCubesBaker {
+  type Value = u8;
+  type Coord = u16;
   type AtlasValue = u8;
 
   fn bake<C, T, M>(chunk: &C, options: &BakerOptions<T>) -> Result<Option<M>>
@@ -45,13 +45,13 @@ impl Baker for DensityMarchingCubesBaker {
 
           let air_check = [
             chunk.is_air(x, y, z),
-            chunk.is_air(x + 1., y, z),
-            chunk.is_air(x + 1., y + 1., z),
-            chunk.is_air(x, y + 1., z),
-            chunk.is_air(x, y, z + 1.),
-            chunk.is_air(x + 1., y, z + 1.),
-            chunk.is_air(x + 1., y + 1., z + 1.),
-            chunk.is_air(x, y + 1., z + 1.),
+            chunk.is_air(x + 1, y, z),
+            chunk.is_air(x + 1, y + 1, z),
+            chunk.is_air(x, y + 1, z),
+            chunk.is_air(x, y, z + 1),
+            chunk.is_air(x + 1, y, z + 1),
+            chunk.is_air(x + 1, y + 1, z + 1),
+            chunk.is_air(x, y + 1, z + 1),
           ];
           if air_check.iter().all(|&v| v == false) || air_check.iter().all(|&v| v == true) {
             continue;
@@ -60,13 +60,13 @@ impl Baker for DensityMarchingCubesBaker {
           let grid = GridCell {
             value: [
               chunk.get(x, y, z) as f32,
-              chunk.get(x + 1., y, z) as f32,
-              chunk.get(x + 1., y + 1., z) as f32,
-              chunk.get(x, y + 1., z) as f32,
-              chunk.get(x, y, z + 1.) as f32,
-              chunk.get(x + 1., y, z + 1.) as f32,
-              chunk.get(x + 1., y + 1., z + 1.) as f32,
-              chunk.get(x, y + 1., z + 1.) as f32,
+              chunk.get(x + 1, y, z) as f32,
+              chunk.get(x + 1, y + 1, z) as f32,
+              chunk.get(x, y + 1, z) as f32,
+              chunk.get(x, y, z + 1) as f32,
+              chunk.get(x + 1, y, z + 1) as f32,
+              chunk.get(x + 1, y + 1, z + 1) as f32,
+              chunk.get(x, y + 1, z + 1) as f32,
             ],
             point: [
               [fx + 0.0, fy + 0.0, fz + 0.0].into(),
@@ -85,15 +85,16 @@ impl Baker for DensityMarchingCubesBaker {
           for (vertex, face_uvs, corner) in polys {
             let normal = compute_normal(&vertex);
 
+            // Get atlas at this corner_idx
             let atlas = match corner {
               0 => chunk.get_atlas(x, y, z),
-              1 => chunk.get_atlas(x + 1., y, z),
-              2 => chunk.get_atlas(x + 1., y + 1., z),
-              3 => chunk.get_atlas(x, y + 1., z),
-              4 => chunk.get_atlas(x, y, z + 1.),
-              5 => chunk.get_atlas(x + 1., y, z + 1.),
-              6 => chunk.get_atlas(x + 1., y + 1., z + 1.),
-              7 => chunk.get_atlas(x, y + 1., z + 1.),
+              1 => chunk.get_atlas(x + 1, y, z),
+              2 => chunk.get_atlas(x + 1, y + 1, z),
+              3 => chunk.get_atlas(x, y + 1, z),
+              4 => chunk.get_atlas(x, y, z + 1),
+              5 => chunk.get_atlas(x + 1, y, z + 1),
+              6 => chunk.get_atlas(x + 1, y + 1, z + 1),
+              7 => chunk.get_atlas(x, y + 1, z + 1),
               _ => unreachable!(),
             };
 
