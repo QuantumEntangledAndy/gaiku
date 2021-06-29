@@ -10,6 +10,7 @@ use amethyst::{
     math::{Matrix4, Vector3, Vector4},
     transform::{Transform, TransformBundle},
   },
+  ecs::prelude::*,
   input::{InputBundle, StringBindings},
   prelude::*,
   renderer::{
@@ -25,6 +26,7 @@ use amethyst::{
 };
 
 use gaiku_baker_marching_cubes::MarchingCubesBaker;
+use gaiku_baker_modified_marching_cubes::ModMarchingCubesBaker;
 use gaiku_baker_voxel::VoxelBaker;
 use gaiku_common::{chunk::Chunk, Baker};
 use gaiku_format_gox::GoxReader;
@@ -34,6 +36,7 @@ use gaiku_amethyst::prelude::*;
 enum BakerSelect {
   Voxel,
   Marching,
+  ModMarching,
 }
 
 fn main() -> amethyst::Result<()> {
@@ -85,9 +88,26 @@ impl SimpleState for GameLoad {
 
     self.initialise_camera(world);
     self.add_light(world);
-    self.build_terrain(world, BakerSelect::Voxel, [-6., 0., 0.]);
-    self.build_terrain(world, BakerSelect::Marching, [6., 0., 0.]);
+    self.build_terrain(world, BakerSelect::Voxel, [-12., 0., 0.]);
+    self.build_terrain(world, BakerSelect::Marching, [0., 0., 0.]);
+    self.build_terrain(world, BakerSelect::ModMarching, [12., 0., 0.]);
   }
+
+  // Uncomment this to print the camera position.
+  // Useful to find where you might want to save the camera position
+  //
+  // fn fixed_update(&mut self, data: StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
+  //   let world = data.world;
+  //   type SystemData<'s> = (Read<'s, ActiveCamera>, ReadStorage<'s, Transform>);
+  //   world.exec(|(act_cam, transforms): SystemData| {
+  //     if let Some(act_cam_ent) = act_cam.entity {
+  //       if let Some(cam_trans) = transforms.get(act_cam_ent) {
+  //         println!("Cam Location: {:?}", cam_trans.translation());
+  //       }
+  //     }
+  //   });
+  //   SimpleTrans::None
+  // }
 }
 
 impl Default for GameLoad {
@@ -103,7 +123,7 @@ impl GameLoad {
 
   fn initialise_camera(&self, world: &mut World) {
     let mut transform = Transform::default();
-    transform.set_translation_xyz(0., 10., 15.0);
+    transform.set_translation_xyz(0., 10., 22.0);
     transform.face_towards(Vector3::new(0., 5., 0.), Vector3::new(0., 1., 0.));
 
     let cam_ent = world
@@ -144,6 +164,11 @@ impl GameLoad {
         env!("CARGO_MANIFEST_DIR"),
         "marching_text"
       ),
+      BakerSelect::ModMarching => format!(
+        "{}/examples/assets/{}.gox",
+        env!("CARGO_MANIFEST_DIR"),
+        "mod_marching_text"
+      ),
     };
 
     let (chunks, texture) = GoxReader::read::<Chunk, GaikuTexture2d>(&file).unwrap();
@@ -160,6 +185,9 @@ impl GameLoad {
         }
         BakerSelect::Marching => {
           MarchingCubesBaker::bake::<Chunk, GaikuTexture2d, GaikuMesh>(chunk, &options).unwrap()
+        }
+        BakerSelect::ModMarching => {
+          ModMarchingCubesBaker::bake::<Chunk, GaikuTexture2d, GaikuMesh>(chunk, &options).unwrap()
         }
       };
       let dimension = [
@@ -185,6 +213,10 @@ impl GameLoad {
         }
         BakerSelect::Marching => {
           MarchingCubesBaker::bake::<Chunk, GaikuTexture2d, GaikuMesh>(chunk, &text_options)
+            .unwrap()
+        }
+        BakerSelect::ModMarching => {
+          ModMarchingCubesBaker::bake::<Chunk, GaikuTexture2d, GaikuMesh>(chunk, &text_options)
             .unwrap()
         }
       };
