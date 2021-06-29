@@ -319,48 +319,24 @@ fn maybe_average(
   }
 }
 
-pub(crate) fn vec_sum_sq(a: &[f32; 3]) -> f32 {
-  a[0].powi(2) + a[1].powi(2) + a[2].powi(2)
-}
-
-pub(crate) fn vec_length(a: &[f32; 3]) -> f32 {
-  vec_sum_sq(a).sqrt()
-}
-
-pub(crate) fn vec_sub(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
-  [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-}
-
-pub(crate) fn vec_add(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
-  [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-}
-
-pub(crate) fn vec_ave(vecs: Vec<&[f32; 3]>) -> [f32; 3] {
-  vec_mult(
-    &vecs.iter().fold([0., 0., 0.], |acc, v| vec_add(&acc, v)),
-    1. / vecs.len() as f32,
-  )
-}
-
-pub(crate) fn vec_mult(vec: &[f32; 3], factor: f32) -> [f32; 3] {
-  [vec[0] * factor, vec[1] * factor, vec[2] * factor]
-}
-
-pub(crate) fn vec_cross(a: &[f32; 3], b: &[f32; 3]) -> [f32; 3] {
-  [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0],
-  ]
-}
-
-pub(crate) fn vec_normalised(a: &[f32; 3]) -> [f32; 3] {
-  vec_mult(a, 1. / vec_length(a))
+fn vec_ave(vs: Vec<&[f32; 3]>) -> [f32; 3] {
+  let len = vs.len();
+  assert!(len > 0);
+  let v3s: Vec<_> = vs
+    .iter()
+    .map(|&&v| {
+      let v3: Vec3 = v.into();
+      v3
+    })
+    .collect();
+  let sum = v3s.iter().fold(Vec3::zero(), |acc, &v3| acc + v3);
+  (sum / len as f32).into()
 }
 
 pub(crate) fn compute_normal(triangle: &[[f32; 3]; 3]) -> [f32; 3] {
-  vec_cross(
-    &vec_normalised(&vec_sub(&triangle[1], &triangle[0])),
-    &vec_normalised(&vec_sub(&triangle[2], &triangle[0])),
-  )
+  let v1: Vec3 = triangle[0].into();
+  let v2: Vec3 = triangle[1].into();
+  let v3: Vec3 = triangle[2].into();
+
+  (v2 - v1).normalize().cross((v3 - v1).normalize()).into()
 }
