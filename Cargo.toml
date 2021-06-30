@@ -59,6 +59,11 @@ harness = false
 required-features = ["marching_cubes", "gox"]
 
 [[bench]]
+name = "modified_marching_cubes"
+harness = false
+required-features = ["marching_cubes", "gox"]
+
+[[bench]]
 name = "voxel"
 harness = false
 required-features = ["voxel", "gox"]

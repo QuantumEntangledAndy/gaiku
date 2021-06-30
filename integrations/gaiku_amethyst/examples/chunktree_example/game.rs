@@ -255,7 +255,7 @@ impl GameLoad {
               );
 
               let bounds = visible_lod.get_bounds();
-              density.fill_chunk(&mut chunk, (1, 1), bounds, 0.);
+              chunk.fill_chunk(1, &density, bounds);
 
               let origin = visible_lod.get_origin();
               let target_size = visible_lod.get_size();

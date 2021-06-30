@@ -150,9 +150,10 @@ mod test {
   #[test]
   fn simple_test() {
     let options = Default::default();
-    let mut chunk = Chunk::new([0.0, 0.0, 0.0], 2, 2, 2);
+    let mut chunk = Chunk::new([0.0, 0.0, 0.0], 3, 3, 3);
 
-    chunk.set(0, 0, 0, (0, 1));
+    chunk.set(1, 1, 1, 1);
+    chunk.set_atlas(1, 1, 1, 0);
 
     let mesh = VoxelBaker::bake::<Chunk, Texture2d, Mesh>(&chunk, &options)
       .unwrap()
@@ -161,7 +162,7 @@ mod test {
     let positions_count = mesh.get_positions().len();
     let indices_count = mesh.get_indices().len();
 
-    assert_eq!(indices_count, 36);
-    assert_eq!(positions_count, 24);
+    assert_eq!(indices_count, 144);
+    assert_eq!(positions_count, 78);
   }
 }
